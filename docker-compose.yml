@@ -1,0 +1,37 @@
+# Dev stack for the Pi side of Virtual Watchman.
+# The same images run on the Raspberry Pi; see docker-compose.pi.yml.
+
+services:
+  mosquitto:
+    image: eclipse-mosquitto:2.0.20
+    ports:
+      - "${MQTT_PUBLISH_PORT:-1883}:1883"   # reachable from the real Nicla on the LAN
+    volumes:
+      - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - mosquitto-data:/mosquitto/data
+    healthcheck:
+      test: ["CMD", "mosquitto_sub", "-t", "$$SYS/broker/uptime", "-C", "1", "-W", "3"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  recognizer:
+    build: ./pi
+    image: watchman-recognizer:dev
+    env_file: .env
+    environment:
+      MQTT_HOST: mosquitto
+      MQTT_PORT: 1883
+    volumes:
+      - ./pi:/app                # live-edit source without rebuilding
+      - ./models:/models
+      - ./data:/data
+    depends_on:
+      mosquitto:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # nicla-sim arrives in M3 (profiles: [sim]).
+
+volumes:
+  mosquitto-data:

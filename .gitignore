@@ -1,0 +1,21 @@
+# Secrets and local config
+.env
+nicla/config.py
+
+# Face data, footage, embeddings, logs — never commit (GDPR)
+data/**
+!data/**/
+!data/**/.gitkeep
+
+# Downloaded models
+models/*
+!models/.gitkeep
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+
+# macOS
+.DS_Store
