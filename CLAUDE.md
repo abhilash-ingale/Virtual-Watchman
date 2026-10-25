@@ -98,6 +98,7 @@ docker compose up -d mosquitto recognizer          # broker + recognizer
 docker compose --profile sim up nicla-sim          # replay sample footage
 docker compose exec recognizer python -m watchman.enroll --name abhi data/enroll/abhi
 docker compose exec recognizer pytest
+docker compose exec recognizer python -m pytest -p no:cacheprovider /nicla/tests   # Nicla state machine under CPython
 docker compose exec mosquitto mosquitto_sub -t 'door/#' -v   # watch all traffic
 docker compose logs -f recognizer
 ```
@@ -121,9 +122,12 @@ Each milestone ends with something you can demo. Pi-side milestones are develope
 - [x] **Done when:** *(verified 2026-10-25, incl. publish via Mac LAN IP and broker-restart reconnect)* `docker compose up` starts the broker and a recognizer stub that logs every `door/#` message; `mosquitto_pub` from the host is seen by the stub.
 
 ### M1 — Nicla detection in the OpenMV IDE *(host, no Docker)*
-- [ ] `nicla/main.py`: person detection at ~5 fps with 3-of-5 debounce
-- [ ] MONITOR / BROADCAST / COOLDOWN state machine, 10–15 s timeout, ~30 s cooldown
-- [ ] **Done when:** the IDE terminal prints confirmed events reliably with few false triggers.
+- [x] `nicla/main.py`: person detection at ~5 fps with debounce, now threshold 0.8 and 4 of 5 frames after 0.7 / 3-of-5 gave false triggers on an empty scene (built-in `/rom/person_detect.tflite` via `ml`; `csi` camera API with `sensor` fallback for firmware < 4.7)
+- [x] MONITOR / BROADCAST / COOLDOWN state machine, 12 s timeout, 30 s cooldown; LED off / blue / red
+- [x] Hardware-free logic unit-tested under CPython (`nicla/tests`), MicroPython syntax checked with `mpy-cross`
+- [ ] **Done when:** the IDE terminal prints confirmed events reliably with few false triggers. *(needs the real board)*
+
+Running on the board: OpenMV IDE → connect → open `nicla/main.py` → Run. The terminal prints `state person=score loop <fps> infer <ms>` per frame (loop rate includes the throttle; infer is model time only) and `=== STATE (reason)` on transitions. To start on power-up, save it to the board's drive as `main.py`. Tune `PERSON_THRESHOLD` and the debounce at the top of the file.
 
 ### M2 — MQTT event reaches the broker
 - [ ] Nicla connects to Wi-Fi and the dockerised broker on the Mac; publishes `door/event`
@@ -158,6 +162,10 @@ Each milestone ends with something you can demo. Pi-side milestones are develope
 - PIR wake-up so the Nicla can sleep and run on battery
 - OAK camera inside the door as a second viewpoint
 
+### Parked topics (revisit later)
+- **Scene-clear re-arm:** return from COOLDOWN to MONITOR only after ~3 s of clearly empty frames (plus a short minimum cooldown) instead of a fixed 30 s. Closes the "second person within 30 s is missed" gap. Needs reliable empty-scene scores, so revisit with M6 footage. Fixed 30 s kept for now.
+- **ToF + camera fusion:** the Nicla Vision has an on-board VL53L1X time-of-flight sensor (driver frozen into the firmware as `vl53l1x`). Use distance (something within ~0.5–2 m, or a sudden change) together with the person score to confirm a person, to cut false triggers from exposure jumps or person-like shapes, and possibly as a cheap wake-up signal before running the model.
+
 ---
 
 ## 5. Watch out for
@@ -178,4 +186,4 @@ Each milestone ends with something you can demo. Pi-side milestones are develope
 - Keep the MQTT topic contract in section 1 as the single source of truth; update it here if it changes.
 
 ## Current status / next step
-M0 done (2026-10-25). Next: **M1** — the OpenMV person-detection script for the Nicla with the debounce logic.
+M0 done (2026-10-25). M1 code written and tested off-device; next: run it on the Nicla in the OpenMV IDE and tune the threshold, then **M2** — MQTT `door/event` to the broker.
