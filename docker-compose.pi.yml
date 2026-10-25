@@ -1,0 +1,14 @@
+# Raspberry Pi override:
+#   docker compose -f docker-compose.yml -f docker-compose.pi.yml up -d
+# Uses the code baked into the image instead of the bind-mounted source.
+
+services:
+  mosquitto:
+    restart: unless-stopped
+
+  recognizer:
+    image: watchman-recognizer:latest
+    volumes: !override
+      - ./models:/models:ro
+      - ./data:/data
+    restart: unless-stopped
